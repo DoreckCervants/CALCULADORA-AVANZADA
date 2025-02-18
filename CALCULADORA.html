@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora Estadística Avanzada</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e7f7e7;
+            border: 1px solid #4CAF50;
+            border-radius: 5px;
+            font-size: 1.1em;
+            text-align: center;
+        }
+        canvas {
+            max-width: 100%;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Calculadora Estadística Avanzada</h1>
+    <div class="container">
+        <label for="datos">Ingrese los datos separados por comas:</label>
+        <input type="text" id="datos" placeholder="Ejemplo: 3,5,7,9,11">
+        
+        <label for="operacion">Seleccione la operación:</label>
+        <select id="operacion">
+            <option value="media">Media</option>
+            <option value="mediana">Mediana</option>
+            <option value="moda">Moda</option>
+            <option value="varianza">Varianza</option>
+            <option value="desviacion">Desviación Estándar</option>
+            <option value="coef_var">Coeficiente de Variación</option>
+            <option value="desviacion_media">Desviación Media</option>
+            <option value="distribucion">Distribución Normal</option>
+        </select>
+        
+        <button onclick="calcular()">Calcular</button>
+        
+        <div id="resultado" class="result" style="display: none;"></div>
+        <canvas id="grafico"></canvas>
+    </div>
+
+    <script>
+        let chartInstance = null;
+
+        function calcular() {
+            const datosInput = document.getElementById('datos').value;
+            const operacion = document.getElementById('operacion').value;
+            const resultadoDiv = document.getElementById('resultado');
+            const ctx = document.getElementById('grafico').getContext('2d');
+            let datos = datosInput.split(',').map(num => parseFloat(num.trim()));
+
+            if (datos.some(isNaN)) {
+                resultadoDiv.style.display = 'block';
+                resultadoDiv.textContent = "Por favor, ingrese datos numéricos válidos.";
+                return;
+            }
+
+            const media = () => datos.reduce((a, b) => a + b, 0) / datos.length;
+            const mediana = () => {
+                datos.sort((a, b) => a - b);
+                const mitad = Math.floor(datos.length / 2);
+                return datos.length % 2 === 0 ? (datos[mitad - 1] + datos[mitad]) / 2 : datos[mitad];
+            };
+            const moda = () => {
+                const frecuencias = {};
+                datos.forEach(num => frecuencias[num] = (frecuencias[num] || 0) + 1);
+                const maxFrecuencia = Math.max(...Object.values(frecuencias));
+                return Object.keys(frecuencias).filter(num => frecuencias[num] === maxFrecuencia).map(Number);
+            };
+            const varianza = () => {
+                const m = media();
+                return datos.reduce((a, b) => a + Math.pow(b - m, 2), 0) / datos.length;
+            };
+            const desviacionEstandar = () => Math.sqrt(varianza());
+            const coeficienteVariacion = () => (desviacionEstandar() / media()) * 100;
+            const desviacionMedia = () => datos.reduce((a, b) => a + Math.abs(b - media()), 0) / datos.length;
+
+            let resultadoTexto;
+            let valores = datos;
+            let tipoGrafico = 'bar';
+            
+            switch (operacion) {
+                case 'media': resultadoTexto = `Media: ${media().toFixed(2)}`; break;
+                case 'mediana': resultadoTexto = `Mediana: ${mediana().toFixed(2)}`; break;
+                case 'moda': resultadoTexto = `Moda: ${moda().join(', ')}`; break;
+                case 'varianza': resultadoTexto = `Varianza: ${varianza().toFixed(2)}`; break;
+                case 'desviacion': resultadoTexto = `Desviación Estándar: ${desviacionEstandar().toFixed(2)}`; break;
+                case 'coef_var': resultadoTexto = `Coeficiente de Variación: ${coeficienteVariacion().toFixed(2)}%`; break;
+                case 'desviacion_media': resultadoTexto = `Desviación Media: ${desviacionMedia().toFixed(2)}`; break;
+                case 'distribucion': 
+                    resultadoTexto = `Distribución Normal calculada.`;
+                    tipoGrafico = 'line';
+                    valores = datos.sort((a, b) => a - b).map(x => ({ x, y: (1 / (desviacionEstandar() * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((x - media()) / desviacionEstandar(), 2)) }));
+                    break;
+            }
+
+            resultadoDiv.style.display = 'block';
+            resultadoDiv.textContent = resultadoTexto;
+
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: tipoGrafico,
+                data: {
+                    labels: valores.map(v => v.x || v),
+                    datasets: [{
+                        label: operacion,
+                        data: valores.map(v => v.y || v),
+                        backgroundColor: 'rgba(76, 175, 80, 0.5)',
+                        borderColor: 'rgba(76, 175, 80, 1)',
+                        borderWidth: 1,
+                        fill: false,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+
+
+
+
